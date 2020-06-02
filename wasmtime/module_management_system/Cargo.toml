@@ -1,0 +1,13 @@
+[package]
+name = "wasmtime"
+version = "0.1.0"
+authors = ["daubaris <paulius.daubaris@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+wasmtime = "0.13.0"
+anyhow = "1.0.26"
+wasmtime-wasi = "0.13.0"
+wasi-common = "0.13.0"
