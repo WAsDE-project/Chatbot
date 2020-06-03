@@ -260,99 +260,12 @@ int32 Call(wasm_exec_env_t exec_env, char* wasmname, char* functionname)
     return retval;
 }
 
-/*
-    This function can be called by the wasm modules to call functions from other modules.
-
-    The function searches a loaded module with the given name. Then it will find a function with the given name.
-    Then it will allocate memory in the found module for buffers of given lengths and copy the data from
-    the given buffers to the allocated ones. The found function is then called with these allocated buffers as arguments.
-    Once the function call ends we validate that the return buffer is still valid. We then copy the return buffer's contents
-    to the caller's memory buffer and free the previously allocated memory from the found module.
-    In the end we return the return value of the called function.
-
-    @param exec_env: the runtime's own execution environment
-    @param wasmname: the name of the wasm module to call the function from
-    @param functionname: the name of the function to call
-    @param src_buf: Buffer containing data passed to the called function
-    @param src_len: Length of the buffer
-    @param src_buf: Buffer for the return value of the called function
-    @param src_len: Length of the buffer
-    @return 0 in case of success and 1 in case of a failure
-*/
-int32 CallWithMemory(wasm_exec_env_t exec_env, char* wasmname, char* functionname, char * src_buf, uint32_t src_len, char * dest_buf, uint32_t dest_len)
-{
-    // find module by name
-    ModuleData* data = Modules;
-    while (data) {
-        if (!strcmp(data->name, wasmname)) {
-            break;
-        }
-        data = data->next;
-    }
-    if (!data) {
-        printf("No module %s loaded!\n", wasmname);
-        return 1;
-    }
-    
-    // find the function by name
-    wasm_function_inst_t func = wasm_runtime_lookup_function(data->module_inst, functionname, "(i32i32i32i32)i32");
-    if (!func)
-    {
-        printf("Could not find function %s from module %s!\n", functionname, wasmname);
-        return 1;
-    }
-
-    // Allocate memory in the found module with the size of the caller's buffers
-    // and copy the caller's buffer's contents to the allocated buffers 
-    int32_t src_index = wasm_runtime_module_dup_data(data->module_inst, src_buf, src_len);
-    if (!src_index) {
-        printf("Could not allocate memory for function call src!\n");
-        return 1;
-    }
-    int32_t dest_index = wasm_runtime_module_dup_data(data->module_inst, dest_buf, dest_len);
-    if (!dest_index) {
-        printf("Could not allocate memory for function call dest!\n");
-        return 1;
-    }
-
-    // Pass the allocated memory buffer indexes to the called function and call the function
-    // The return value of the called function is placed in the parameter array
-    uint32 argv[] = {src_index, src_len, dest_index, dest_len}; // 64 bit uses 2 values for return
-    if (!wasm_runtime_call_wasm(data->exec_env, func, 4, argv))
-    {
-        printf("%s\n", wasm_runtime_get_exception(data->module_inst));
-        return 1;
-    }
-
-    /* the return value is stored in argv[0] */
-    int retval = argv[0];
-
-    // do boundary check for the buffer
-    if (!wasm_runtime_validate_app_addr(data->module_inst, dest_index, dest_len))
-        return 1;
-
-    // do address conversion from wasm index to pointer for the buffer
-    char* ret_buffer = wasm_runtime_addr_app_to_native(data->module_inst, dest_index);
-    
-    // Copy the data from return buffer to the return buffer of the caller
-    strncpy(dest_buf, ret_buffer, dest_len);
-
-    // Free previously allocated buffers from the found module
-    wasm_runtime_module_free(data->module_inst, src_index);
-    wasm_runtime_module_free(data->module_inst, dest_index);
-
-    // return called function's return value
-    return retval;
-}
-
-
 // An array of host functions to expose to wasm modules
 // They can be imported and called by the wasm modules
 // Read more about this here: https://github.com/bytecodealliance/wasm-micro-runtime/blob/master/doc/export_native_api.md
 static NativeSymbol native_symbols[] =
 {
     EXPORT_WASM_API_WITH_SIG(Call, "($$)i"),
-    EXPORT_WASM_API_WITH_SIG(CallWithMemory, "($$*~*~)i"),
     EXPORT_WASM_API_WITH_SIG(Load, "($)i"),
     EXPORT_WASM_API_WITH_SIG(Unload, "($)i")
 };
