@@ -18,6 +18,9 @@ INSTANCES = {}
 def seek(name, memory):
     data = memory.data_ptr()
 
+    if (name < 0 or name >= memory.data_len()):
+        raise Exception("The supplied address is out of bounds")
+
     for i, _ in enumerate(data[name:memory.data_len()]):
         if data[name + i] == 0:
             return i
