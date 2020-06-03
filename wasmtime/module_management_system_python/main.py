@@ -16,11 +16,13 @@ INSTANCES = {}
 
 
 def seek(name, memory):
-    for i, _ in enumerate(memory.data_ptr()):
-        if memory.data_ptr()[name + i] == 0:
-            break
+    data = memory.data_ptr()
 
-    return i
+    for i, _ in enumerate(data[name:memory.data_len()]):
+        if data[name + i] == 0:
+            return i
+
+    raise Exception("No null character at the end of the memory")
 
 
 def return_wasi_imports(store, module):
