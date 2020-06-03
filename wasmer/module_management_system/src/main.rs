@@ -34,7 +34,6 @@ fn create_import_object(name: &str, module: &Module) -> ImportObject {
     // Add our api imports.
     let mut ns = Namespace::new();
     ns.insert("Call", func!(call));
-    ns.insert("CallWithMemory", func!(call_with_memory));
     ns.insert("Load", func!(load));
     ns.insert("Unload", func!(unload));
     import_object.register("env", ns);
@@ -59,68 +58,7 @@ fn call(ctx: &mut Ctx, module_name: WasmPtr<u8, Array>, function_name: WasmPtr<u
         .get_utf8_string_with_nul(caller_memory)
         .unwrap();
     let function: Func<(), ()> = instance.func(function_name).unwrap();
-    let result = function.call();
-    0
-}
-
-fn call_with_memory(
-    ctx: &mut Ctx,
-    module_name: WasmPtr<u8, Array>,
-    function_name: WasmPtr<u8, Array>,
-    source: WasmPtr<u8, Array>,
-    source_len: u32,
-    target: WasmPtr<u8, Array>,
-    _target_len: u32,
-) -> i32 {
-    // Read the module name from memory
-    let caller_memory = ctx.memory(0);
-    let module_name = module_name.get_utf8_string_with_nul(caller_memory).unwrap();
-
-    // get the instance from the hashmap
-    let instance: Instance = {
-        let mut instance_map = INSTANCES.try_lock().unwrap();
-        (*instance_map)
-            .remove(module_name)
-            .expect("module {} is either not loaded or is in use")
-    };
-
-    //Ready the caller's parameter buffer.
-    let memory_reader = source.deref(caller_memory, 0, source_len).unwrap();
-
-    //Ready the callee's parameter buffer.
-    let callee_memory = instance.context().memory(0);
-    let get_parameter_buffer_pointer: Func<(), WasmPtr<u8, Array>> =
-        instance.func("get_parameter_buffer_pointer").unwrap();
-    let parameter_buffer = get_parameter_buffer_pointer.call().unwrap();
-    let memory_writer = parameter_buffer
-        .deref(callee_memory, 0, source_len)
-        .unwrap();
-
-    // Copy parameters between instance memories.
-    for i in 0..source_len as usize {
-        memory_writer[i].set(memory_reader[i].get());
-    }
-
-    // get the function name from the caller's memory and call the function.
-    let function_name = function_name
-        .get_utf8_string_with_nul(caller_memory)
-        .unwrap();
-    let function: Func<u32, u32> = instance.func(function_name).unwrap();
-    let str_len = function.call(source_len).unwrap();
-
-    //ready the callee return buffer.
-    let get_return_buffer_pointer: Func<(), WasmPtr<u8, Array>> =
-    instance.func("get_return_buffer_pointer").unwrap();
-    let return_buffer = get_return_buffer_pointer.call().unwrap();
-    let memory_reader = return_buffer.deref(callee_memory, 0, str_len).unwrap();
-
-    //ready the caller return buffer
-    let memory_writer = target.deref(caller_memory, 0, str_len).unwrap();
-    
-    // copy return value back to the caller.
-    for i in 0..str_len as usize {
-        memory_writer[i].set(memory_reader[i].get());
-    }
+    let _result = function.call();
     0
 }
 
